@@ -2,6 +2,7 @@ package main
 
 import (
 	"reflect"
+	"strings"
 
 	"github.com/pkg/errors"
 )
@@ -17,7 +18,35 @@ import (
 //
 // If you add non-reference types to your configuration struct, be sure to rewrite Clone as a deep
 // copy appropriate for your types.
-type configuration struct{}
+type configuration struct {
+	// ExcludedChannels is a comma-separated list of channel IDs excluded from counting.
+	ExcludedChannels string
+
+	// LeaderboardSize is the number of users shown in leaderboards.
+	LeaderboardSize int
+}
+
+const defaultLeaderboardSize = 10
+
+// excludedChannelSet parses ExcludedChannels into a lookup set.
+func (c *configuration) excludedChannelSet() map[string]bool {
+	set := map[string]bool{}
+	for id := range strings.SplitSeq(c.ExcludedChannels, ",") {
+		id = strings.TrimSpace(id)
+		if id != "" {
+			set[id] = true
+		}
+	}
+	return set
+}
+
+// leaderboardSize returns the configured size, falling back to the default.
+func (c *configuration) leaderboardSize() int {
+	if c.LeaderboardSize <= 0 {
+		return defaultLeaderboardSize
+	}
+	return c.LeaderboardSize
+}
 
 // Clone shallow copies the configuration. Your implementation may require a deep copy if
 // your configuration has reference types.

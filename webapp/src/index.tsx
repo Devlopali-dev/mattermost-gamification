@@ -2,16 +2,37 @@
 // See LICENSE.txt for license information.
 
 import manifest from 'manifest';
+import React from 'react';
 import type {Store} from 'redux';
 
 import type {GlobalState} from '@mattermost/types/store';
 
 import type {PluginRegistry} from 'types/mattermost-webapp';
 
+import LeaderboardPanel from './components/leaderboard_panel';
+
+const trophyIcon = (
+    <span
+        aria-label='Leaderboard'
+        style={{fontSize: '16px'}}
+    >
+        {'🏆'}
+    </span>
+);
+
 export default class Plugin {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars, @typescript-eslint/no-empty-function
     public async initialize(registry: PluginRegistry, store: Store<GlobalState>) {
-        // @see https://developers.mattermost.com/extend/plugins/webapp/reference/
+        const {showRHSPlugin} = registry.registerRightHandSidebarComponent(
+            LeaderboardPanel,
+            'Leaderboard',
+        );
+
+        registry.registerChannelHeaderButtonAction(
+            trophyIcon,
+            () => store.dispatch(showRHSPlugin),
+            'Leaderboard',
+            'Voir le classement des messages',
+        );
     }
 }
 

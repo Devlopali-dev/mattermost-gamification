@@ -1,11 +1,19 @@
 package main
 
 import (
+	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/mattermost/mattermost/server/public/plugin"
 )
+
+type leaderboardResponse struct {
+	Period  string      `json:"period"`
+	Channel Leaderboard `json:"channel"`
+	Global  Leaderboard `json:"global"`
+}
 
 // initRouter initializes the HTTP router for the plugin.
 func (p *Plugin) initRouter() *mux.Router {
@@ -16,14 +24,13 @@ func (p *Plugin) initRouter() *mux.Router {
 
 	apiRouter := router.PathPrefix("/api/v1").Subrouter()
 
-	apiRouter.HandleFunc("/hello", p.HelloWorld).Methods(http.MethodGet)
+	apiRouter.HandleFunc("/leaderboard", p.handleLeaderboard).Methods(http.MethodGet)
 
 	return router
 }
 
-// ServeHTTP demonstrates a plugin that handles HTTP requests by greeting the world.
-// The root URL is currently <siteUrl>/plugins/com.mattermost.plugin-starter-template/api/v1/. Replace com.mattermost.plugin-starter-template with the plugin ID.
-func (p *Plugin) ServeHTTP(c *plugin.Context, w http.ResponseWriter, r *http.Request) {
+// ServeHTTP handles requests under <siteUrl>/plugins/com.devlopali.gamification/.
+func (p *Plugin) ServeHTTP(_ *plugin.Context, w http.ResponseWriter, r *http.Request) {
 	p.router.ServeHTTP(w, r)
 }
 
@@ -39,9 +46,73 @@ func (p *Plugin) MattermostAuthorizationRequired(next http.Handler) http.Handler
 	})
 }
 
-func (p *Plugin) HelloWorld(w http.ResponseWriter, r *http.Request) {
-	if _, err := w.Write([]byte("Hello, world!")); err != nil {
-		p.API.LogError("Failed to write response", "error", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+// handleLeaderboard serves GET /api/v1/leaderboard?channel_id=...&period=week|month|all
+func (p *Plugin) handleLeaderboard(w http.ResponseWriter, r *http.Request) {
+	userID := r.Header.Get("Mattermost-User-ID")
+
+	channelID := r.URL.Query().Get("channel_id")
+	if channelID == "" {
+		http.Error(w, "channel_id is required", http.StatusBadRequest)
+		return
+	}
+
+	period := r.URL.Query().Get("period")
+	if period == "" {
+		period = PeriodWeek
+	}
+	if !validPeriod(period) {
+		http.Error(w, "period must be week, month or all", http.StatusBadRequest)
+		return
+	}
+
+	// Only channel members may read a channel's stats.
+	if _, err := p.client.Channel.GetMember(channelID, userID); err != nil {
+		http.Error(w, "Not a member of this channel", http.StatusForbidden)
+		return
+	}
+
+	now := time.Now()
+	size := p.getConfiguration().leaderboardSize()
+	resolve := p.usernameResolver()
+
+	channelCounts, err := p.channelCounts(channelID, period, now)
+	if err != nil {
+		p.client.Log.Error("Failed to compute channel leaderboard", "channel_id", channelID, "error", err.Error())
+		http.Error(w, "Internal error", http.StatusInternalServerError)
+		return
+	}
+
+	globalCounts, err := p.globalCounts(period, now)
+	if err != nil {
+		p.client.Log.Error("Failed to compute global leaderboard", "error", err.Error())
+		http.Error(w, "Internal error", http.StatusInternalServerError)
+		return
+	}
+
+	response := leaderboardResponse{
+		Period:  period,
+		Channel: buildLeaderboard(channelCounts, size, userID, resolve),
+		Global:  buildLeaderboard(globalCounts, size, userID, resolve),
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		p.client.Log.Error("Failed to encode leaderboard response", "error", err.Error())
+	}
+}
+
+// usernameResolver returns a memoizing userID → username lookup.
+func (p *Plugin) usernameResolver() func(userID string) string {
+	cache := map[string]string{}
+	return func(userID string) string {
+		if username, ok := cache[userID]; ok {
+			return username
+		}
+		username := userID
+		if user, err := p.client.User.Get(userID); err == nil {
+			username = user.Username
+		}
+		cache[userID] = username
+		return username
 	}
 }

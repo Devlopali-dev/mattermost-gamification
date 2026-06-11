@@ -1,11 +1,12 @@
 {
-    "id": "com.mattermost.plugin-starter-template",
-    "name": "Plugin Starter Template",
-    "description": "This plugin serves as a starting point for writing a Mattermost plugin.",
-    "homepage_url": "https://github.com/mattermost/mattermost-plugin-starter-template",
-    "support_url": "https://github.com/mattermost/mattermost-plugin-starter-template/issues",
+    "id": "com.devlopali.gamification",
+    "name": "Gamification",
+    "description": "Compte les messages des utilisateurs (par channel et global) et affiche un leaderboard dans un panneau latéral.",
+    "homepage_url": "https://github.com/Devlopali-dev/mattermost-gamification",
+    "support_url": "https://github.com/Devlopali-dev/mattermost-gamification/issues",
     "icon_path": "assets/starter-template-icon.svg",
-    "min_server_version": "6.2.1",
+    "version": "0.1.0",
+    "min_server_version": "9.0.0",
     "server": {
         "executables": {
             "linux-amd64": "server/dist/plugin-linux-amd64",
@@ -19,8 +20,23 @@
         "bundle_path": "webapp/dist/main.js"
     },
     "settings_schema": {
-        "header": "",
+        "header": "Paramètres du système de gamification.",
         "footer": "",
-        "settings": []
+        "settings": [
+            {
+                "key": "ExcludedChannels",
+                "display_name": "Channels exclus",
+                "type": "text",
+                "help_text": "IDs de channels à exclure du comptage, séparés par des virgules.",
+                "default": ""
+            },
+            {
+                "key": "LeaderboardSize",
+                "display_name": "Taille du classement",
+                "type": "number",
+                "help_text": "Nombre d'utilisateurs affichés dans le leaderboard.",
+                "default": 10
+            }
+        ]
     }
 }
