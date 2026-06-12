@@ -9,6 +9,7 @@ import type {GlobalState} from '@mattermost/types/store';
 
 import type {PluginRegistry} from 'types/mattermost-webapp';
 
+import GamificationApp from './components/gamification_app';
 import LeaderboardPanel from './components/leaderboard_panel';
 
 const trophyIcon = (
@@ -32,6 +33,19 @@ export default class Plugin {
             () => store.dispatch(showRHSPlugin),
             'Leaderboard',
             'Voir le classement des messages',
+        );
+
+        // Entry in the product switcher menu (alongside Channels, Playbooks, …),
+        // pointing to a full-page global leaderboard.
+        registry.registerProduct(
+            '/gamification',
+            'trophy-outline',
+            'Gamification',
+            '/gamification',
+            GamificationApp,
+            () => null,
+            undefined,
+            false,
         );
     }
 }

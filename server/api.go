@@ -10,9 +10,9 @@ import (
 )
 
 type leaderboardResponse struct {
-	Period  string      `json:"period"`
-	Channel Leaderboard `json:"channel"`
-	Global  Leaderboard `json:"global"`
+	Period  string       `json:"period"`
+	Channel *Leaderboard `json:"channel,omitempty"`
+	Global  Leaderboard  `json:"global"`
 }
 
 // initRouter initializes the HTTP router for the plugin.
@@ -46,15 +46,12 @@ func (p *Plugin) MattermostAuthorizationRequired(next http.Handler) http.Handler
 	})
 }
 
-// handleLeaderboard serves GET /api/v1/leaderboard?channel_id=...&period=week|month|all
+// handleLeaderboard serves GET /api/v1/leaderboard?period=week|month|all[&channel_id=...]
+// Without channel_id, only the global leaderboard is returned.
 func (p *Plugin) handleLeaderboard(w http.ResponseWriter, r *http.Request) {
 	userID := r.Header.Get("Mattermost-User-ID")
 
 	channelID := r.URL.Query().Get("channel_id")
-	if channelID == "" {
-		http.Error(w, "channel_id is required", http.StatusBadRequest)
-		return
-	}
 
 	period := r.URL.Query().Get("period")
 	if period == "" {
@@ -65,21 +62,26 @@ func (p *Plugin) handleLeaderboard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Only channel members may read a channel's stats.
-	if _, err := p.client.Channel.GetMember(channelID, userID); err != nil {
-		http.Error(w, "Not a member of this channel", http.StatusForbidden)
-		return
-	}
-
 	now := time.Now()
 	size := p.getConfiguration().leaderboardSize()
 	resolve := p.usernameResolver()
 
-	channelCounts, err := p.channelCounts(channelID, period, now)
-	if err != nil {
-		p.client.Log.Error("Failed to compute channel leaderboard", "channel_id", channelID, "error", err.Error())
-		http.Error(w, "Internal error", http.StatusInternalServerError)
-		return
+	var channelBoard *Leaderboard
+	if channelID != "" {
+		// Only channel members may read a channel's stats.
+		if _, err := p.client.Channel.GetMember(channelID, userID); err != nil {
+			http.Error(w, "Not a member of this channel", http.StatusForbidden)
+			return
+		}
+
+		channelCounts, err := p.channelCounts(channelID, period, now)
+		if err != nil {
+			p.client.Log.Error("Failed to compute channel leaderboard", "channel_id", channelID, "error", err.Error())
+			http.Error(w, "Internal error", http.StatusInternalServerError)
+			return
+		}
+		board := buildLeaderboard(channelCounts, size, userID, resolve)
+		channelBoard = &board
 	}
 
 	globalCounts, err := p.globalCounts(period, now)
@@ -91,7 +93,7 @@ func (p *Plugin) handleLeaderboard(w http.ResponseWriter, r *http.Request) {
 
 	response := leaderboardResponse{
 		Period:  period,
-		Channel: buildLeaderboard(channelCounts, size, userID, resolve),
+		Channel: channelBoard,
 		Global:  buildLeaderboard(globalCounts, size, userID, resolve),
 	}
 

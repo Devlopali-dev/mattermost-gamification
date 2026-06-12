@@ -3,14 +3,11 @@ import {useSelector} from 'react-redux';
 
 import {getCurrentChannelId} from 'mattermost-redux/selectors/entities/common';
 
-import type {Board, LeaderboardResponse, Period} from '../client';
-import {fetchLeaderboard} from '../client';
+import BoardSection, {boardStyles} from './board_section';
+import PeriodTabs from './period_tabs';
 
-const PERIODS: Array<{key: Period; label: string}> = [
-    {key: 'week', label: 'Semaine'},
-    {key: 'month', label: 'Mois'},
-    {key: 'all', label: 'Total'},
-];
+import type {LeaderboardResponse, Period} from '../client';
+import {fetchLeaderboard} from '../client';
 
 const styles: Record<string, React.CSSProperties> = {
     panel: {
@@ -19,63 +16,6 @@ const styles: Record<string, React.CSSProperties> = {
         height: '100%',
         overflowY: 'auto',
         padding: '12px 16px',
-    },
-    tabs: {
-        display: 'flex',
-        gap: '4px',
-        marginBottom: '16px',
-    },
-    tab: {
-        flex: 1,
-        padding: '6px 0',
-        border: '1px solid rgba(var(--center-channel-color-rgb), 0.16)',
-        borderRadius: '4px',
-        background: 'transparent',
-        color: 'var(--center-channel-color)',
-        cursor: 'pointer',
-        fontWeight: 600,
-    },
-    tabActive: {
-        background: 'var(--button-bg)',
-        color: 'var(--button-color)',
-        border: '1px solid var(--button-bg)',
-    },
-    sectionTitle: {
-        margin: '12px 0 8px',
-        fontSize: '14px',
-        fontWeight: 700,
-        textTransform: 'uppercase',
-        opacity: 0.7,
-    },
-    row: {
-        display: 'flex',
-        alignItems: 'center',
-        padding: '6px 4px',
-        borderBottom: '1px solid rgba(var(--center-channel-color-rgb), 0.08)',
-    },
-    rank: {
-        width: '28px',
-        fontWeight: 700,
-        opacity: 0.7,
-    },
-    username: {
-        flex: 1,
-        overflow: 'hidden',
-        textOverflow: 'ellipsis',
-        whiteSpace: 'nowrap',
-    },
-    count: {
-        fontVariantNumeric: 'tabular-nums',
-        fontWeight: 600,
-    },
-    meRow: {
-        background: 'rgba(var(--center-channel-color-rgb), 0.06)',
-        borderRadius: '4px',
-        marginTop: '4px',
-    },
-    muted: {
-        opacity: 0.7,
-        padding: '8px 4px',
     },
     refresh: {
         marginTop: '16px',
@@ -88,52 +28,6 @@ const styles: Record<string, React.CSSProperties> = {
         alignSelf: 'flex-start',
     },
 };
-
-function medal(rank: number): string {
-    switch (rank) {
-    case 1:
-        return '🥇';
-    case 2:
-        return '🥈';
-    case 3:
-        return '🥉';
-    default:
-        return String(rank);
-    }
-}
-
-function BoardSection({title, board}: {title: string; board?: Board}) {
-    if (!board || board.entries.length === 0) {
-        return (
-            <>
-                <div style={styles.sectionTitle}>{title}</div>
-                <div style={styles.muted}>{'Aucun message compté pour le moment.'}</div>
-            </>
-        );
-    }
-    return (
-        <>
-            <div style={styles.sectionTitle}>{title}</div>
-            {board.entries.map((entry) => (
-                <div
-                    key={entry.user_id}
-                    style={styles.row}
-                >
-                    <span style={styles.rank}>{medal(entry.rank)}</span>
-                    <span style={styles.username}>{'@' + entry.username}</span>
-                    <span style={styles.count}>{entry.count}</span>
-                </div>
-            ))}
-            {board.me && (
-                <div style={{...styles.row, ...styles.meRow}}>
-                    <span style={styles.rank}>{board.me.rank}</span>
-                    <span style={styles.username}>{'@' + board.me.username + ' (toi)'}</span>
-                    <span style={styles.count}>{board.me.count}</span>
-                </div>
-            )}
-        </>
-    );
-}
 
 export default function LeaderboardPanel() {
     const channelId = useSelector(getCurrentChannelId);
@@ -163,20 +57,13 @@ export default function LeaderboardPanel() {
 
     return (
         <div style={styles.panel}>
-            <div style={styles.tabs}>
-                {PERIODS.map((tab) => (
-                    <button
-                        key={tab.key}
-                        style={{...styles.tab, ...(period === tab.key ? styles.tabActive : {})}}
-                        onClick={() => setPeriod(tab.key)}
-                    >
-                        {tab.label}
-                    </button>
-                ))}
-            </div>
+            <PeriodTabs
+                period={period}
+                onChange={setPeriod}
+            />
 
-            {loading && !data && <div style={styles.muted}>{'Chargement…'}</div>}
-            {error && <div style={styles.muted}>{error}</div>}
+            {loading && !data && <div style={boardStyles.muted}>{'Chargement…'}</div>}
+            {error && <div style={boardStyles.muted}>{error}</div>}
 
             {data && (
                 <>
