@@ -15,3 +15,6 @@ server/manifest.go
 
 # Claude Code local settings
 .claude/settings.local.json
+
+# Local deploy config (contains tokens)
+.env
